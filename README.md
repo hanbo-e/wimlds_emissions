@@ -5,7 +5,7 @@ Predicting  which cars should be taken off the road using car emisssions data as
 ![Bad Air Quality Days](ozone_days.png)
 
 ### Solution - help reduce car emissions by predicting which cars will fail emissions test before their mandatory checkup
-![pass the test](can_pass)
+![pass the test](can_pass.png)
 
 ###
 # Resources

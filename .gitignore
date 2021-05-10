@@ -5,5 +5,5 @@ __pyache__
 .python-version
 emissions.egg-info/
 notebooks/.ipynb_checkpoints
-emissions/__pyache__
-tests/__pyache__
+emissions/__pyache__/
+tests/__pyache__/

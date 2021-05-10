@@ -1,5 +1,9 @@
-/data/
+data/
 .DS_Store
 .ipynb_checkpoints
 __pyache__
 .python-version
+emissions.egg-info/
+notebooks/.ipynb_checkpoints
+emissions/__pyache__
+tests/__pyache__

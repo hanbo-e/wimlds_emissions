@@ -82,7 +82,7 @@ def clean_data(df):
     df = df[(df.ODOMETER!=0) & (df.ODOMETER!=8888888) & (df.ODOMETER!=9999999)]
     print(colored(f'\nRecords after droping rows where ODOMETER is missing: {df.shape[0]}', 'red'))
     # engineer MILE_YEAR from ODOMETER
-    df['MILE_YEAR'] = df['ODOMETER']/(df['VEHICLE_AGE']+1)
+    df['MILE_YEAR'] = df['ODOMETER']/df['VEHICLE_AGE']
     # remove the outliers
     df = df[df.MILE_YEAR <= 40000]
     df = df[~((df.VEHICLE_AGE > 10) & (df.MILE_YEAR < 1000))]

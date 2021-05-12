@@ -76,15 +76,16 @@ def clean_data(df):
     # drop the helper column
     df = df1.drop(columns='TEST_DATE')
     
-    # drop 0s in ODOMETER and remove ODOMETER > 100000 
+    # drop 0s in ODOMETER and remove 9999999 and 8888888
     print('\nRecords where ODOMETER = 0:', df[df.ODOMETER==0].shape[0])
-    df = df[df.ODOMETER!=0]
+    df = df[(df.ODOMETER!=0) & (df.ODOMETER!=8888888) & (df.ODOMETER!=9999999)]
     print(colored(f'\nRecords after droping rows where ODOMETER is missing: {df.shape[0]}', 'red'))
     # engineer MILE_YEAR from ODOMETER
-    df['MILE_YEAR'] = df['ODOMETER']/df['VEHICLE_AGE']
+    df['MILE_YEAR'] = df['ODOMETER']/(df['VEHICLE_AGE']+1)
     # remove the outliers
-    df = df[df.MILE_YEAR <= 100000]
-    print(colored(f'\nRecords after droping rows where MILE_YEAR > 100,000: {df.shape[0]}', 'red'))
+    df = df[df.MILE_YEAR <= 40000]
+    df = df[~((df.VEHICLE_AGE > 10) & (df.MILE_YEAR < 1000))]
+    print(colored(f'\nRecords after droping rows where MILE_YEAR > 40,000: {df.shape[0]}', 'red'))
     
     # get median GVWR for each VIN
     tmp = df[['VIN', 'GVWR']].groupby('VIN').agg({'GVWR':'median'})
@@ -101,7 +102,9 @@ def clean_data(df):
     # drop na in GVWR
     print('\nRecords with missing GVWR:', df.GVWR.isnull().sum())
     df = df[~df.GVWR.isnull()]
-    print(colored(f'\nRecords after droping rows where GVWR is missing: {df.shape[0]}', 'red'))
+    # drop low numbers in GVWR
+    df = df[df.GVWR > 1000]
+    print(colored(f'\nRecords after droping rows where GVWR is super low or missing: {df.shape[0]}', 'red'))
     
     # check the share of Pass and Fail after cleaning 
     print(colored('\nShare of Pass and Fail after cleaning:', 'blue'))

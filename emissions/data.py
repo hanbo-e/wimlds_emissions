@@ -48,14 +48,15 @@ def clean_data(df):
     Returns cleaned dataframe
     '''
     print(colored("----------------start cleaning data----------------", 'green'))
-    # check the share of Pass and Fail before cleaning 
-    print(colored('Share of Pass and Fail before cleaning:', 'blue'))
+        
+    # check the data size before cleaning
+    print(colored(f'\nRecords in input data: {df.shape[0]}', 'red'))
+    print(colored('\nShare of Pass and Fail before cleaning:', 'blue'))
     tmp = 100.0*df['RESULT'].value_counts()/df.shape[0]
     print(colored(f'Pass: {round(tmp[1])}%\nFail: {round(tmp[0])}%', 'blue'))
-        
-    # check the data size
-    print(colored(f'\nRecords in input data: {df.shape[0]}', 'red'))
-
+    print(colored(f"\nUnique vehicles in Fail: {df[df.RESULT==0].VIN.nunique()}",'blue'))
+    print(colored(f"Unique vehicles in Pass: {df[df.RESULT==1].VIN.nunique()}",'blue'))
+    
     # transform TEST_SDATE to datetime object
     df['TEST_SDATE'] = pd.to_datetime(df['TEST_SDATE'])
     
@@ -76,15 +77,16 @@ def clean_data(df):
     # drop the helper column
     df = df1.drop(columns='TEST_DATE')
     
-    # drop 0s in ODOMETER and remove ODOMETER > 100000 
+    # drop 0s in ODOMETER and remove 9999999 and 8888888
     print('\nRecords where ODOMETER = 0:', df[df.ODOMETER==0].shape[0])
-    df = df[df.ODOMETER!=0]
+    df = df[(df.ODOMETER!=0) & (df.ODOMETER!=8888888) & (df.ODOMETER!=9999999)]
     print(colored(f'\nRecords after droping rows where ODOMETER is missing: {df.shape[0]}', 'red'))
     # engineer MILE_YEAR from ODOMETER
     df['MILE_YEAR'] = df['ODOMETER']/df['VEHICLE_AGE']
     # remove the outliers
-    df = df[df.MILE_YEAR <= 100000]
-    print(colored(f'\nRecords after droping rows where MILE_YEAR > 100,000: {df.shape[0]}', 'red'))
+    df = df[df.MILE_YEAR <= 40000]
+    df = df[~((df.VEHICLE_AGE > 10) & (df.MILE_YEAR < 1000))]
+    print(colored(f'\nRecords after droping rows where MILE_YEAR > 40,000: {df.shape[0]}', 'red'))
     
     # get median GVWR for each VIN
     tmp = df[['VIN', 'GVWR']].groupby('VIN').agg({'GVWR':'median'})
@@ -101,13 +103,11 @@ def clean_data(df):
     # drop na in GVWR
     print('\nRecords with missing GVWR:', df.GVWR.isnull().sum())
     df = df[~df.GVWR.isnull()]
-    print(colored(f'\nRecords after droping rows where GVWR is missing: {df.shape[0]}', 'red'))
+    # drop low numbers in GVWR
+    df = df[df.GVWR > 1000]
+    print(colored(f'\nRecords after droping rows where GVWR is super low or missing: {df.shape[0]}', 'red'))
     
-    # check the share of Pass and Fail after cleaning 
-    print(colored('\nShare of Pass and Fail after cleaning:', 'blue'))
-    tmp = 100.0*df['RESULT'].value_counts()/df.shape[0]
-    print(colored(f'Pass: {round(tmp[1])}%\nFail: {round(tmp[0])}%', 'blue'))
-    
+
     # select columns
     cols = ['VEHICLE_TYPE',
             'VEHICLE_AGE',
@@ -116,14 +116,25 @@ def clean_data(df):
             'ENGINE_SIZE', 
             'TRANS_TYPE', 
             'TEST_TYPE',
-            'RESULT'
+            'RESULT',
+            'VIN' # will drop this later
             ]
     df = df[cols].copy()
     
     # dropnas
     df = df.dropna()
     df = df.reset_index(drop=True)
+    
+    # check data size after cleaning 
     print(colored(f'\nRecords in output data:{df.shape[0]}', 'red'))
+    print(colored('\nShare of Pass and Fail after cleaning:', 'blue'))
+    tmp = 100.0*df['RESULT'].value_counts()/df.shape[0]
+    print(colored(f'Pass: {round(tmp[1])}%\nFail: {round(tmp[0])}%', 'blue'))
+    print(colored(f"\nUnique vehicles in Fail: {df[df.RESULT==0].VIN.nunique()}",'blue'))
+    print(colored(f"Unique vehicles in Pass: {df[df.RESULT==1].VIN.nunique()}",'blue'))
+    
+    # drop VIN
+    df = df.drop(columns=['VIN'])
     return df
 
 def split(df=None, test_size=0.2):
@@ -133,7 +144,7 @@ def split(df=None, test_size=0.2):
     '''
     if df is None:   
         df = load_data()   
-    df = clean_data(df) 
+        df = clean_data(df) 
     X = df.drop(columns=['RESULT'])
     y = df['RESULT']
     X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=test_size, random_state=42)

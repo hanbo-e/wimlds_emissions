@@ -28,7 +28,8 @@ def load_data():
             'ENGINE_SIZE', 
             'TRANS_TYPE',
             'ODOMETER', 
-            'OVERALL_RESULT']
+            'OVERALL_RESULT',
+            'MAKE']
     df = df[cols].copy()
     
     # drop the rows where the test was aborted 'A' or overrided 'O'
@@ -44,7 +45,7 @@ def clean_data(df):
     '''
     Takes a pandas datafram with at least the following columns: 
         TEST_SDATE, VIN, VEHICLE_TYPE, MODEL_YEAR, ODOMETER, 
-        GVWR, ENGINE_SIZE, TRANS_TYPE, TEST_TYPE.
+        GVWR, ENGINE_SIZE, TRANS_TYPE, TEST_TYPE, 'MAKE'.
     Returns cleaned dataframe
     '''
     print(colored("----------------start cleaning data----------------", 'green'))
@@ -107,6 +108,14 @@ def clean_data(df):
     df = df[df.GVWR > 1000]
     print(colored(f'\nRecords after droping rows where GVWR is super low or missing: {df.shape[0]}', 'red'))
     
+    #set make to string and to lower case, strip trailing and internal whitespace
+    df['MAKE'] = df['MAKE'].astype('string').str.strip().str.lower().str.replace(' ', '')
+    #create a make label 'other' for all makes that only account for less than 1% of cars each and together aprox <10% of cars
+    value_counts_norm = df['MAKE'].value_counts(normalize = True)
+    to_other = value_counts_norm[value_counts_norm < 0.01]
+    print(f"\n{len(to_other)} make labels each account for less than 0.01% of cars and together account for {round(to_other.sum(), 4)}% of cars")
+    print(f"Grouping these car makes into one category called 'other'")
+    df['MAKE'] = df['MAKE'].replace(to_other.index, 'other')
 
     # select columns
     cols = ['VEHICLE_TYPE',
@@ -117,7 +126,8 @@ def clean_data(df):
             'TRANS_TYPE', 
             'TEST_TYPE',
             'RESULT',
-            'VIN' # will drop this later
+            'VIN', # will drop this later
+            'MAKE'
             ]
     df = df[cols].copy()
     

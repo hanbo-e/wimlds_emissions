@@ -64,6 +64,9 @@ def clean_data(df):
     # engineering VEHICLE_AGE
     df['VEHICLE_AGE'] = df.TEST_SDATE.dt.year.astype('int') - df.MODEL_YEAR.astype('int') + 2
     
+    # create a flag column for old cars
+    df['IS_OLD'] = (df.MODEL_YEAR.astype('int')) < 2000
+    
     # if a vehicle has multiple records from the same date, keep earliest record 
     # add a helper column which has date but not hours of the day
     df['TEST_DATE'] = df['TEST_SDATE'].dt.date
@@ -127,7 +130,8 @@ def clean_data(df):
             'TEST_TYPE',
             'RESULT',
             'VIN', # will drop this later
-            'MAKE'
+            'MAKE',
+            'IS_OLD'
             ]
     df = df[cols].copy()
     

@@ -36,7 +36,7 @@ def load_data():
     df = df[df.OVERALL_RESULT.isin(['P','F'])]
     
     # P=1, F=1
-    df['RESULT'] = df['OVERALL_RESULT'].map({'P':1, 'F':0})
+    df['RESULT'] = df['OVERALL_RESULT'].map({'P':0, 'F':1})
     df.drop(columns=['OVERALL_RESULT'], inplace=True)
     print(colored(f"Data loaded: {df.shape[0]} records", 'blue'))
     return df
@@ -54,9 +54,9 @@ def clean_data(df):
     print(colored(f'\nRecords in input data: {df.shape[0]}', 'red'))
     print(colored('\nShare of Pass and Fail before cleaning:', 'blue'))
     tmp = 100.0*df['RESULT'].value_counts()/df.shape[0]
-    print(colored(f'Pass: {round(tmp[1])}%\nFail: {round(tmp[0])}%', 'blue'))
-    print(colored(f"\nUnique vehicles in Fail: {df[df.RESULT==0].VIN.nunique()}",'blue'))
-    print(colored(f"Unique vehicles in Pass: {df[df.RESULT==1].VIN.nunique()}",'blue'))
+    print(colored(f'Fail: {round(tmp[1])}%\nPass: {round(tmp[0])}%', 'blue'))
+    print(colored(f"\nUnique vehicles in Fail: {df[df.RESULT==1].VIN.nunique()}",'blue'))
+    print(colored(f"Unique vehicles in Pass: {df[df.RESULT==0].VIN.nunique()}",'blue'))
     
     # transform TEST_SDATE to datetime object
     df['TEST_SDATE'] = pd.to_datetime(df['TEST_SDATE'])
@@ -65,7 +65,7 @@ def clean_data(df):
     df['VEHICLE_AGE'] = df.TEST_SDATE.dt.year.astype('int') - df.MODEL_YEAR.astype('int') + 2
     
     # create a flag column for old cars
-    df['IS_OLD'] = (df.MODEL_YEAR.astype('int')) < 2000
+    df['BEFORE_2000'] = (df.MODEL_YEAR.astype('int') < 2000).astype('int')
     
     # if a vehicle has multiple records from the same date, keep earliest record 
     # add a helper column which has date but not hours of the day
@@ -86,7 +86,7 @@ def clean_data(df):
     df = df[(df.ODOMETER!=0) & (df.ODOMETER!=8888888) & (df.ODOMETER!=9999999)]
     print(colored(f'\nRecords after droping rows where ODOMETER is missing: {df.shape[0]}', 'red'))
     # engineer MILE_YEAR from ODOMETER
-    df['MILE_YEAR'] = df['ODOMETER']/df['VEHICLE_AGE']
+    df['MILE_YEAR'] = np.round(df['ODOMETER']/df['VEHICLE_AGE'], 2)
     # remove the outliers
     df = df[df.MILE_YEAR <= 40000]
     df = df[~((df.VEHICLE_AGE > 10) & (df.MILE_YEAR < 1000))]
@@ -120,6 +120,12 @@ def clean_data(df):
     print(f"Grouping these car makes into one category called 'other'")
     df['MAKE'] = df['MAKE'].replace(to_other.index, 'other')
 
+    # engineer ENGINE_WEIGHT_RATIO
+    df['ENGINE_WEIGHT_RATIO'] = np.round(df['ENGINE_SIZE']/df['GVWR'], 2)
+    
+    # engineer MAKE_VEHICLE_TYPE
+    df['MAKE_VEHICLE_TYPE'] = df['MAKE'] + df.VEHICLE_TYPE.astype('str')
+    
     # select columns
     cols = ['VEHICLE_TYPE',
             'VEHICLE_AGE',
@@ -131,7 +137,9 @@ def clean_data(df):
             'RESULT',
             'VIN', # will drop this later
             'MAKE',
-            'IS_OLD'
+            'BEFORE_2000',
+            'ENGINE_WEIGHT_RATIO',
+            'MAKE_VEHICLE_TYPE'
             ]
     df = df[cols].copy()
     
@@ -143,9 +151,9 @@ def clean_data(df):
     print(colored(f'\nRecords in output data:{df.shape[0]}', 'red'))
     print(colored('\nShare of Pass and Fail after cleaning:', 'blue'))
     tmp = 100.0*df['RESULT'].value_counts()/df.shape[0]
-    print(colored(f'Pass: {round(tmp[1])}%\nFail: {round(tmp[0])}%', 'blue'))
-    print(colored(f"\nUnique vehicles in Fail: {df[df.RESULT==0].VIN.nunique()}",'blue'))
-    print(colored(f"Unique vehicles in Pass: {df[df.RESULT==1].VIN.nunique()}",'blue'))
+    print(colored(f'Fail: {round(tmp[1])}%\nPass: {round(tmp[0])}%', 'blue'))
+    print(colored(f"\nUnique vehicles in Fail: {df[df.RESULT==1].VIN.nunique()}",'blue'))
+    print(colored(f"Unique vehicles in Pass: {df[df.RESULT==0].VIN.nunique()}",'blue'))
     
     # drop VIN
     df = df.drop(columns=['VIN'])

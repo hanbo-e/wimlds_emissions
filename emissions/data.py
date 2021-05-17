@@ -67,19 +67,26 @@ def clean_data(df):
     # create a flag column for old cars
     df['BEFORE_2000'] = (df.MODEL_YEAR.astype('int') < 2000).astype('int')
     
-    # if a vehicle has multiple records from the same date, keep earliest record 
-    # add a helper column which has date but not hours of the day
+    # # if a vehicle has multiple records from the same date, keep earliest record 
+    # # add a helper column which has date but not hours of the day
+    # df['TEST_DATE'] = df['TEST_SDATE'].dt.date
+    # # keep the first record from the same date for each vehicle
+    # df['VIN'] = df['VIN'].astype('string').str.strip().str.lower()
+    # df1 = df.loc[df.groupby(['VIN', 'TEST_DATE'])['TEST_SDATE'].idxmin(),:].copy()
+    # df1.reset_index(inplace=True)
+    # # select the records whose vehicles got tested more than 1 time a day
+    # df2 = df[~df.index.isin(df1.index)]
+    # print("\nRecords where vehicles received tests more than 1 time in a day:", df2.shape[0])
+    # print(colored(f'\nRecords after keeping one test per day: {df1.shape[0]}', 'red'))
+    # # drop the helper column
+    # df = df1.drop(columns='TEST_DATE')
+    
+    # remove tests within two months of another test from the data
     df['TEST_DATE'] = df['TEST_SDATE'].dt.date
-    # keep the first record from the same date for each vehicle
-    df['VIN'] = df['VIN'].astype('string').str.strip().str.lower()
-    df1 = df.loc[df.groupby(['VIN', 'TEST_DATE'])['TEST_SDATE'].idxmin(),:].copy()
-    df1.reset_index(inplace=True)
-    # select the records whose vehicles got tested more than 1 time a day
-    df2 = df[~df.index.isin(df1.index)]
-    print("\nRecords where vehicles received tests more than 1 time in a day:", df2.shape[0])
-    print(colored(f'\nRecords after keeping one test per day: {df1.shape[0]}', 'red'))
+    df = df.loc[~(df.groupby('VIN')['TEST_DATE'].diff() < np.timedelta64(2, 'M'))]
+    print(colored(f'\nRecords after keeping one test per two months: {df.shape[0]}', 'red'))
     # drop the helper column
-    df = df1.drop(columns='TEST_DATE')
+    df = df.drop(columns='TEST_DATE')
     
     # drop 0s in ODOMETER and remove 9999999 and 8888888
     print('\nRecords where ODOMETER = 0:', df[df.ODOMETER==0].shape[0])
@@ -117,11 +124,14 @@ def clean_data(df):
     value_counts_norm = df['MAKE'].value_counts(normalize = True)
     to_other = value_counts_norm[value_counts_norm < 0.01]
     print(f"\n{len(to_other)} make labels each account for less than 0.01% of cars and together account for {round(to_other.sum(), 4)}% of cars")
-    print(f"Grouping these car makes into one category called 'other'")
+    print("Grouping these car makes into one category called 'other'")
     df['MAKE'] = df['MAKE'].replace(to_other.index, 'other')
 
     # engineer ENGINE_WEIGHT_RATIO
     df['ENGINE_WEIGHT_RATIO'] = np.round(df['ENGINE_SIZE']/df['GVWR'], 2)
+    # use ENGINE_WEIGHT_RATIO to identify sports cars
+    df['SPORT'] = df['ENGINE_WEIGHT_RATIO'] > 2
+    df["SPORT"] = df["SPORT"].astype(int)
     
     # engineer MAKE_VEHICLE_TYPE
     df['MAKE_VEHICLE_TYPE'] = df['MAKE'] + df.VEHICLE_TYPE.astype('str')
@@ -139,6 +149,7 @@ def clean_data(df):
             'MAKE',
             'BEFORE_2000',
             'ENGINE_WEIGHT_RATIO',
+            'SPORT',
             'MAKE_VEHICLE_TYPE'
             ]
     df = df[cols].copy()

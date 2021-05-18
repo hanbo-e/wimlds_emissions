@@ -45,7 +45,7 @@ def clean_data(df):
     '''
     Takes a pandas datafram with at least the following columns: 
         TEST_SDATE, VIN, VEHICLE_TYPE, MODEL_YEAR, ODOMETER, 
-        GVWR, ENGINE_SIZE, TRANS_TYPE, TEST_TYPE, 'MAKE'.
+        GVWR, ENGINE_SIZE, TRANS_TYPE, TEST_TYPE, MAKE.
     Returns cleaned dataframe
     '''
     print(colored("----------------start cleaning data----------------", 'green'))
@@ -67,39 +67,10 @@ def clean_data(df):
     # create a flag column for old cars
     df['BEFORE_2000'] = (df.MODEL_YEAR.astype('int') < 2000).astype('int')
     
-    # # if a vehicle has multiple records from the same date, keep earliest record 
-    # # add a helper column which has date but not hours of the day
-    # df['TEST_DATE'] = df['TEST_SDATE'].dt.date
-    # # keep the first record from the same date for each vehicle
-    # df['VIN'] = df['VIN'].astype('string').str.strip().str.lower()
-    # df1 = df.loc[df.groupby(['VIN', 'TEST_DATE'])['TEST_SDATE'].idxmin(),:].copy()
-    # df1.reset_index(inplace=True)
-    # # select the records whose vehicles got tested more than 1 time a day
-    # df2 = df[~df.index.isin(df1.index)]
-    # print("\nRecords where vehicles received tests more than 1 time in a day:", df2.shape[0])
-    # print(colored(f'\nRecords after keeping one test per day: {df1.shape[0]}', 'red'))
-    # # drop the helper column
-    # df = df1.drop(columns='TEST_DATE')
-    
-    # remove tests within two months of another test from the data
-    df['TEST_DATE'] = df['TEST_SDATE'].dt.date
-    df = df.loc[~(df.groupby('VIN')['TEST_DATE'].diff() < np.timedelta64(2, 'M'))]
-    print(colored(f'\nRecords after keeping one test per two months: {df.shape[0]}', 'red'))
-    # drop the helper column
-    df = df.drop(columns='TEST_DATE')
-    
-    # drop 0s in ODOMETER and remove 9999999 and 8888888
-    print('\nRecords where ODOMETER = 0:', df[df.ODOMETER==0].shape[0])
-    df = df[(df.ODOMETER!=0) & (df.ODOMETER!=8888888) & (df.ODOMETER!=9999999)]
-    print(colored(f'\nRecords after droping rows where ODOMETER is missing: {df.shape[0]}', 'red'))
-    # engineer MILE_YEAR from ODOMETER
-    df['MILE_YEAR'] = np.round(df['ODOMETER']/df['VEHICLE_AGE'], 2)
-    # remove the outliers
-    df = df[df.MILE_YEAR <= 40000]
-    df = df[~((df.VEHICLE_AGE > 10) & (df.MILE_YEAR < 1000))]
-    print(colored(f'\nRecords after droping rows where MILE_YEAR > 40,000: {df.shape[0]}', 'red'))
-    
     # get median GVWR for each VIN
+    # clean VIN
+    df['VIN'] = df['VIN'].astype('string').str.strip().str.lower()
+    # get median GVWR
     tmp = df[['VIN', 'GVWR']].groupby('VIN').agg({'GVWR':'median'})
     tmp.reset_index(inplace=True)
     # merge tmp with df
@@ -116,7 +87,23 @@ def clean_data(df):
     df = df[~df.GVWR.isnull()]
     # drop low numbers in GVWR
     df = df[df.GVWR > 1000]
-    print(colored(f'\nRecords after droping rows where GVWR is super low or missing: {df.shape[0]}', 'red'))
+    print(colored(f'\nRecords after droping rows where GVWR is < 1000 or missing: {df.shape[0]}', 'red'))
+    
+    # if a vehicle has multiple test records within 1 month, keep earliest record 
+    df = df.sort_values('TEST_SDATE')
+    df = df.loc[~(df.groupby('VIN')['TEST_SDATE'].diff() < np.timedelta64(1, 'M'))]
+    print(colored(f'\nRecords after keeping only the earliest test within a month for each vehicle: {df.shape[0]}', 'red'))
+    
+    # drop 0s in ODOMETER and remove 9999999 and 8888888
+    print('\nRecords where ODOMETER = 0:', df[df.ODOMETER==0].shape[0])
+    df = df[(df.ODOMETER!=0) & (df.ODOMETER!=8888888) & (df.ODOMETER!=9999999)]
+    print(colored(f'\nRecords after droping rows where ODOMETER is missing: {df.shape[0]}', 'red'))
+    # engineer MILE_YEAR from ODOMETER
+    df['MILE_YEAR'] = np.round(df['ODOMETER']/df['VEHICLE_AGE'], 2)
+    # remove the outliers
+    df = df[df.MILE_YEAR <= 40000]
+    df = df[~((df.VEHICLE_AGE > 10) & (df.MILE_YEAR < 1000))]
+    print(colored(f'\nRecords after droping rows where MILE_YEAR > 40,000: {df.shape[0]}', 'red'))
     
     #set make to string and to lower case, strip trailing and internal whitespace
     df['MAKE'] = df['MAKE'].astype('string').str.strip().str.lower().str.replace(' ', '')
@@ -165,7 +152,10 @@ def clean_data(df):
     print(colored(f'Fail: {round(tmp[1])}%\nPass: {round(tmp[0])}%', 'blue'))
     print(colored(f"\nUnique vehicles in Fail: {df[df.RESULT==1].VIN.nunique()}",'blue'))
     print(colored(f"Unique vehicles in Pass: {df[df.RESULT==0].VIN.nunique()}",'blue'))
-    
+    print(colored("""
+    Final features: 
+    MAKE, VEHICLE_TYPE, MAKE_VEHICLE_TYPE, TRANS_TYPE, TEST_TYPE, BEFORE_2000, VEHICLE_AGE, 
+    MILE_YEAR, GVWR, ENGINE_SIZE, ENGINE_WEIGHT_RATIO, SPORT, RESULT """, 'green'))
     # drop VIN
     df = df.drop(columns=['VIN'])
     return df
@@ -196,4 +186,4 @@ def split(df=None, test_size=0.2):
 
 if __name__ == "__main__":
     df = load_data()
-    clean_data(df, with_target=True)
+    clean_data(df)

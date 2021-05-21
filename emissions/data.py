@@ -125,6 +125,7 @@ def clean_data(df):
     
     # select columns
     cols = ['VEHICLE_TYPE',
+            'MODEL_YEAR',
             'VEHICLE_AGE',
             'MILE_YEAR',
             'GVWR',
@@ -154,7 +155,7 @@ def clean_data(df):
     print(colored(f"Unique vehicles in Pass: {df[df.RESULT==0].VIN.nunique()}",'blue'))
     print(colored("""
     Final features: 
-    MAKE, VEHICLE_TYPE, MAKE_VEHICLE_TYPE, TRANS_TYPE, TEST_TYPE, BEFORE_2000, VEHICLE_AGE, 
+    MAKE, VEHICLE_TYPE, 'MODEL_YEAR', MAKE_VEHICLE_TYPE, TRANS_TYPE, TEST_TYPE, BEFORE_2000, VEHICLE_AGE, 
     MILE_YEAR, GVWR, ENGINE_SIZE, ENGINE_WEIGHT_RATIO, SPORT, RESULT """, 'green'))
     # drop VIN
     df = df.drop(columns=['VIN'])

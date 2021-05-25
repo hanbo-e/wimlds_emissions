@@ -91,7 +91,7 @@ def clean_data(df):
     
     # if a vehicle has multiple test records within 1 month, keep earliest record 
     df = df.sort_values('TEST_SDATE')
-    df = df.loc[~(df.groupby('VIN')['TEST_SDATE'].diff() < np.timedelta64(1, 'M'))]
+    df = df.loc[~(df.groupby('VIN')['TEST_SDATE'].diff() < np.timedelta64(90, 'D'))]
     print(colored(f'\nRecords after keeping only the earliest test within a month for each vehicle: {df.shape[0]}', 'red'))
     
     # drop 0s in ODOMETER and remove 9999999 and 8888888
@@ -130,7 +130,8 @@ def clean_data(df):
             'MAKE',
             'BEFORE_2000',
             'ENGINE_WEIGHT_RATIO',
-            'SPORT'
+            'SPORT',
+            'TEST_SDATE'
             ]
     df = df[cols].copy()
     

@@ -41,7 +41,7 @@ def load_data(path='../data/sample201320.csv'):
     print(colored(f"Data loaded: {df.shape[0]} records", 'blue'))
     return df
 
-def clean_data(df, make_threshhold="0.01"):
+def clean_data(df):
     '''
     Takes a pandas datafram with at least the following columns: 
         TEST_SDATE, VIN, VEHICLE_TYPE, MODEL_YEAR, ODOMETER, 
@@ -104,15 +104,6 @@ def clean_data(df, make_threshhold="0.01"):
     df = df[df.MILE_YEAR <= 40000]
     df = df[~((df.VEHICLE_AGE > 10) & (df.MILE_YEAR < 1000))]
     print(colored(f'\nRecords after droping rows where MILE_YEAR > 40,000: {df.shape[0]}', 'red'))
-    
-    #set make to string and to lower case, strip trailing and internal whitespace
-    df['MAKE'] = df['MAKE'].astype('string').str.strip().str.lower().str.replace(' ', '')
-    #create a make label 'other' for all makes that only account for less than 1% of cars each and together aprox <10% of cars
-    value_counts_norm = df['MAKE'].value_counts(normalize = True)
-    to_other = value_counts_norm[value_counts_norm < float(make_threshhold)]
-    print(f"\n{len(to_other)} make labels each account for less than {round((float(make_threshhold) * 100), 2)}% of cars and together account for {(round(to_other.sum(), 4)) *100}% of cars")
-    print("Grouping these car makes into one category called 'other'")
-    df['MAKE'] = df['MAKE'].replace(to_other.index, 'other')
 
     # engineer ENGINE_WEIGHT_RATIO
     df['ENGINE_WEIGHT_RATIO'] = np.round(df['ENGINE_SIZE']/df['GVWR'], 2)
@@ -120,8 +111,10 @@ def clean_data(df, make_threshhold="0.01"):
     df['SPORT'] = df['ENGINE_WEIGHT_RATIO'] > 2
     df["SPORT"] = df["SPORT"].astype(int)
     
-    # engineer MAKE_VEHICLE_TYPE
-    df['MAKE_VEHICLE_TYPE'] = df['MAKE'] + df.VEHICLE_TYPE.astype('str')
+    # engineer MAKE_VEHICLE_TYPE    
+    #set make to string and to lower case, strip trailing and internal whitespace
+    df['MAKE'] = df['MAKE'].astype('string').str.strip().str.lower().str.replace(' ', '')
+    #df['MAKE_VEHICLE_TYPE'] = df['MAKE'] + df.VEHICLE_TYPE.astype('str')
     
     # select columns
     cols = ['VEHICLE_TYPE',
@@ -138,7 +131,6 @@ def clean_data(df, make_threshhold="0.01"):
             'BEFORE_2000',
             'ENGINE_WEIGHT_RATIO',
             'SPORT',
-            'MAKE_VEHICLE_TYPE',
             'TEST_SDATE'
             ]
     df = df[cols].copy()
@@ -156,7 +148,7 @@ def clean_data(df, make_threshhold="0.01"):
     print(colored(f"Unique vehicles in Pass: {df[df.RESULT==0].VIN.nunique()}",'blue'))
     print(colored("""
     Final features: 
-    MAKE, VEHICLE_TYPE, 'MODEL_YEAR', MAKE_VEHICLE_TYPE, TRANS_TYPE, TEST_TYPE, BEFORE_2000, VEHICLE_AGE, 
+    MAKE, VEHICLE_TYPE, MODEL_YEAR, TRANS_TYPE, TEST_TYPE, BEFORE_2000, VEHICLE_AGE, 
     MILE_YEAR, GVWR, ENGINE_SIZE, ENGINE_WEIGHT_RATIO, SPORT, RESULT """, 'green'))
     # drop VIN
     df = df.drop(columns=['VIN'])
@@ -186,6 +178,41 @@ def split(df=None, test_size=0.2):
     print(colored(f'Pass: {round(tmp[1])}%\nFail: {round(tmp[0])}%', 'blue'))
     return X_train, X_test, y_train, y_test
 
+def make_transform_get(df, make_threshhold="0.01"):
+    '''
+    Take cleaned training data and return a list of makes to be converted to 'other'
+    '''
+    #set make to string and to lower case, strip trailing and internal whitespace
+    #df['MAKE'] = df['MAKE'].astype('string').str.strip().str.lower().str.replace(' ', '')
+    #create a make label 'other' for all makes that only account for less than 1% of cars each and together aprox <10% of cars
+    value_counts_norm = df['MAKE'].value_counts(normalize = True)
+    to_other = value_counts_norm[value_counts_norm < float(make_threshhold)]
+    print(f"\n{len(to_other)} make labels each account for less than {round((float(make_threshhold) *100), 2)}% of cars and together account for {(round(to_other.sum(), 4)) *100}% of cars")
+    #print("Grouping these car makes into one category called 'other'")
+    #df['MAKE'] = df['MAKE'].replace(to_other.index, 'other')
+    list_to_other = list(to_other.index)
+    list_to_other.sort()
+    return list_to_other
+
+def make_transform_set(df, list_to_other):
+    '''
+    Take test df and replace make labels from list with 'other'
+    '''
+    df = df.copy()
+    df['MAKE'] = df['MAKE'].replace(list_to_other, 'other')
+    return df
+
+def make_engineer(df):
+    df = df.copy()
+    #df['MAKE'] = df['MAKE'].astype('string').str.strip().str.lower().str.replace(' ', '')
+    df['MAKE_VEHICLE_TYPE'] = df['MAKE'] + df.VEHICLE_TYPE.astype('str')
+    return df
+
 if __name__ == "__main__":
     df = load_data()
-    clean_data(df)
+    clean_df = clean_data(df)
+    to_other = make_transform_get(clean_df)
+    df_make = make_transform_set(clean_df, to_other)
+    df_make = make_engineer(df_make)
+    print(df_make[['MAKE', 'MAKE_VEHICLE_TYPE']].head())
+    print(clean_df['MAKE'].head())

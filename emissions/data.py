@@ -11,14 +11,14 @@ import numpy as np
 from termcolor import colored
 from sklearn.model_selection import train_test_split
 
-def load_data():
+def load_data(path='../data/sample201320.csv'):
     '''
     1. reads data from data folder
     2. selects relative columns
     3. drops the rows where OVERALL_RESULT is not P or F
     '''
     print(colored("----------------start loading data----------------", 'green'))
-    df = pd.read_csv('../data/sample201320.csv', low_memory=False)
+    df = pd.read_csv(path, low_memory=False)
     cols = ['TEST_TYPE', 
             'TEST_SDATE',
             'VIN', 
@@ -41,7 +41,7 @@ def load_data():
     print(colored(f"Data loaded: {df.shape[0]} records", 'blue'))
     return df
 
-def clean_data(df):
+def clean_data(df, make_threshhold="0.01"):
     '''
     Takes a pandas datafram with at least the following columns: 
         TEST_SDATE, VIN, VEHICLE_TYPE, MODEL_YEAR, ODOMETER, 
@@ -109,8 +109,8 @@ def clean_data(df):
     df['MAKE'] = df['MAKE'].astype('string').str.strip().str.lower().str.replace(' ', '')
     #create a make label 'other' for all makes that only account for less than 1% of cars each and together aprox <10% of cars
     value_counts_norm = df['MAKE'].value_counts(normalize = True)
-    to_other = value_counts_norm[value_counts_norm < 0.01]
-    print(f"\n{len(to_other)} make labels each account for less than 0.01% of cars and together account for {round(to_other.sum(), 4)}% of cars")
+    to_other = value_counts_norm[value_counts_norm < float(make_threshhold)]
+    print(f"\n{len(to_other)} make labels each account for less than {round((float(make_threshhold) * 100), 2)}% of cars and together account for {(round(to_other.sum(), 4)) *100}% of cars")
     print("Grouping these car makes into one category called 'other'")
     df['MAKE'] = df['MAKE'].replace(to_other.index, 'other')
 

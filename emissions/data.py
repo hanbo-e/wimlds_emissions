@@ -3,8 +3,6 @@
 """
 Created on May 10 2021
 
-@author: Guli-Y
-
 """
 import pandas as pd
 import numpy as np

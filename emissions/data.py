@@ -3,8 +3,6 @@
 """
 Created on May 10 2021
 
-@author: Guli-Y
-
 """
 import pandas as pd
 import numpy as np
@@ -63,9 +61,6 @@ def clean_data(df):
     
     # engineering VEHICLE_AGE
     df['VEHICLE_AGE'] = df.TEST_SDATE.dt.year.astype('int') - df.MODEL_YEAR.astype('int') + 2
-    
-    # create a flag column for old cars
-    df['BEFORE_2000'] = (df.MODEL_YEAR.astype('int') < 2000).astype('int')
     
     # get median GVWR for each VIN
     # clean VIN
@@ -128,7 +123,6 @@ def clean_data(df):
             'RESULT',
             'VIN', # will drop this later
             'MAKE',
-            'BEFORE_2000',
             'ENGINE_WEIGHT_RATIO',
             'SPORT',
             'TEST_SDATE'
@@ -146,12 +140,9 @@ def clean_data(df):
     print(colored(f'Fail: {round(tmp[1])}%\nPass: {round(tmp[0])}%', 'blue'))
     print(colored(f"\nUnique vehicles in Fail: {df[df.RESULT==1].VIN.nunique()}",'blue'))
     print(colored(f"Unique vehicles in Pass: {df[df.RESULT==0].VIN.nunique()}",'blue'))
-    print(colored("""
-    Final features: 
-    MAKE, VEHICLE_TYPE, MODEL_YEAR, TRANS_TYPE, TEST_TYPE, BEFORE_2000, VEHICLE_AGE, 
-    MILE_YEAR, GVWR, ENGINE_SIZE, ENGINE_WEIGHT_RATIO, SPORT, RESULT """, 'green'))
     # drop VIN
     df = df.drop(columns=['VIN'])
+    print(df.columns.values)
     return df
 
 def split(df=None, test_size=0.2):
@@ -178,41 +169,7 @@ def split(df=None, test_size=0.2):
     print(colored(f'Pass: {round(tmp[1])}%\nFail: {round(tmp[0])}%', 'blue'))
     return X_train, X_test, y_train, y_test
 
-def make_transform_get(df, make_threshhold="0.01"):
-    '''
-    Take cleaned training data and return a list of makes to be converted to 'other'
-    '''
-    #set make to string and to lower case, strip trailing and internal whitespace
-    #df['MAKE'] = df['MAKE'].astype('string').str.strip().str.lower().str.replace(' ', '')
-    #create a make label 'other' for all makes that only account for less than 1% of cars each and together aprox <10% of cars
-    value_counts_norm = df['MAKE'].value_counts(normalize = True)
-    to_other = value_counts_norm[value_counts_norm < float(make_threshhold)]
-    print(f"\n{len(to_other)} make labels each account for less than {round((float(make_threshhold) *100), 2)}% of cars and together account for {(round(to_other.sum(), 4)) *100}% of cars")
-    #print("Grouping these car makes into one category called 'other'")
-    #df['MAKE'] = df['MAKE'].replace(to_other.index, 'other')
-    list_to_other = list(to_other.index)
-    list_to_other.sort()
-    return list_to_other
-
-def make_transform_set(df, list_to_other):
-    '''
-    Take test df and replace make labels from list with 'other'
-    '''
-    df = df.copy()
-    df['MAKE'] = df['MAKE'].replace(list_to_other, 'other')
-    return df
-
-def make_engineer(df):
-    df = df.copy()
-    #df['MAKE'] = df['MAKE'].astype('string').str.strip().str.lower().str.replace(' ', '')
-    df['MAKE_VEHICLE_TYPE'] = df['MAKE'] + df.VEHICLE_TYPE.astype('str')
-    return df
-
 if __name__ == "__main__":
     df = load_data()
     clean_df = clean_data(df)
-    to_other = make_transform_get(clean_df)
-    df_make = make_transform_set(clean_df, to_other)
-    df_make = make_engineer(df_make)
-    print(df_make[['MAKE', 'MAKE_VEHICLE_TYPE']].head())
-    print(clean_df['MAKE'].head())
+    print(clean_df.columns)

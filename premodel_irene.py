@@ -8,7 +8,7 @@ Created on Fri May 21 14:50:55 2021
 import matplotlib.pyplot as plt
 import pandas as pd
 import numpy as np
-import pickle
+import itertools
 from sklearn.metrics import accuracy_score, recall_score, precision_score
 from sklearn.compose import ColumnTransformer
 from sklearn.pipeline import Pipeline
@@ -17,10 +17,11 @@ from sklearn.tree import DecisionTreeClassifier
 from sklearn.model_selection import GridSearchCV
 from sklearn.model_selection import learning_curve
 from sklearn.model_selection import ShuffleSplit
+# from sklearn.base import BaseEstimator, TransformerMixin
 
 from emissions.data import load_data, clean_data, split
+from emissions.transformer import MakeTransformer
 
-# some nice functions by Guli <3
 def scoring_table(search, param_index,cols):
     """
     takes grid search output and index of best params
@@ -80,7 +81,7 @@ def plot_learning_curve(model, X_train, y_train, name='test', scoring='recall'):
     plt.savefig('../tree_figs/' + name + '.png', bbox_inches='tight')
     plt.close()
         
-## ACTUAL STUFF
+## Get and clean data
 
 # first of all: get the data
 df = load_data()
@@ -89,85 +90,198 @@ df = clean_data(df)
 # second of all: split the data
 X_train, X_test, y_train, y_test = split(df)
 
-# LOOP TO TEST STUFF
-
-# intersting columns
+# interesting columns: THIS DOES NOT WORK WITH MAKE FOR NOW
 col_names = ['MODEL_YEAR','VEHICLE_AGE','MILE_YEAR','GVWR','ENGINE_SIZE',
-             'TRANS_TYPE','TEST_TYPE','MAKE','ENGINE_WEIGHT_RATIO'] 
+             'TRANS_TYPE','TEST_TYPE','ENGINE_WEIGHT_RATIO','VEHICLE_TYPE'] 
+            # ,'BEFORE_2000','SPORT','MAKE_VEHICLE_TYPE','MAKE'
 
-# combinations I wanna test
-col_combs = [('MODEL_YEAR','VEHICLE_AGE','MILE_YEAR'),
-           ('MODEL_YEAR','VEHICLE_AGE','MILE_YEAR','GVWR')]
+m = 20
 
-# lists for saving
-dep = []
-acc = []
-rec = []
-prc = []
-col = []
+## full feature tree
+cols = col_names
+cat_cols = []
+if 'TRANS_TYPE' in cols:
+    cat_cols.extend(['TRANS_TYPE'])
+if 'TEST_TYPE' in cols:
+    cat_cols.extend(['TEST_TYPE'])
+if 'MAKE_VEHICLE_TYPE' in cols:
+    cat_cols.extend(['MAKE_VEHICLE_TYPE'])
+if ('MAKE' in cols):
+    # transform make
+    make_processor = Pipeline([
+        ('make_transformer', MakeTransformer()),
+        ('encoder', OneHotEncoder(handle_unknown='ignore'))
+    ])
+    # Preprocessor
+    preprocessor = ColumnTransformer([
+        ('make_processor', make_processor, ['MAKE']),
+        ('encoder', OneHotEncoder(handle_unknown='ignore'), cat_cols)], 
+        remainder='passthrough'
+    ) 
+    # Combine preprocessor and linear model in pipeline
+    pipe = Pipeline([
+        ('preprocessing', preprocessor),
+        ('model', DecisionTreeClassifier(class_weight='balanced'))
+    ])
+elif cat_cols != []: 
+    # Preprocessor
+    preprocessor = ColumnTransformer([
+        ('encoder', OneHotEncoder(handle_unknown='ignore'), cat_cols)], 
+        remainder='passthrough'
+    )
+    # Combine preprocessor and linear model in pipeline
+    pipe = Pipeline([
+        ('preprocessing', preprocessor),
+        ('model', DecisionTreeClassifier(class_weight='balanced'))
+    ])
+else: 
+    pipe = Pipeline([
+        ('model', DecisionTreeClassifier(class_weight='balanced'))
+    ])
 
-for col_tup in col_combs:
-    cols = list(col_tup)
-    i = len(cols)
-    cat_cols = []
-    if 'TRANS_TYPE' in cols:
-        cat_cols.extend(['TRANS_TYPE'])
-    if 'TEST_TYPE' in cols:
-        cat_cols.extend(['TEST_TYPE'])
-    if 'MAKE' in cols:
-        cat_cols.extend(['MAKE'])
-    if cat_cols != []:     
-        # Preprocessor
-        preprocessor = ColumnTransformer([
-            ('encoder', OneHotEncoder(handle_unknown='ignore'), cat_cols)], 
-            remainder='passthrough'
-        ) 
-        # Combine preprocessor and linear model in pipeline
-        pipe = Pipeline([
-            ('preprocessing', preprocessor),
-            ('model', DecisionTreeClassifier(class_weight='balanced'))
-        ])
-    else: 
-        pipe = Pipeline([
-            ('model', DecisionTreeClassifier(class_weight='balanced'))
-        ])
+# Hyperparameter Grid
+grid = {'model__max_depth': np.arange(2, m, 1)}
 
-    # Hyperparameter Grid
-    grid = {'model__max_depth': np.arange(2, 20, 1)}
-    
-    # Instanciate Grid Search
-    search = GridSearchCV(pipe, 
-                          grid, 
-                          scoring=['accuracy', 'recall', 'precision'],
-                          cv=10,
-                          refit='recall',
-                          return_train_score=True,
-                          n_jobs=18
-                         ) 
-    search.fit(X_train[cols], y_train)
-    
-    result = search.cv_results_
+# Instanciate Grid Search
+search = GridSearchCV(pipe, 
+                      grid, 
+                      scoring=['accuracy', 'recall', 'precision'],
+                      cv=10,
+                      refit='recall',
+                      return_train_score=True,
+                      n_jobs=18
+                     ) 
+search.fit(X_train[cols], y_train)
 
-    pd.DataFrame(result)[['param_model__max_depth', 
-                          'mean_test_recall', 
-                          'mean_train_recall']].sort_values('mean_test_recall', ascending=False).head(5)
-    strts = ''
-    for s in cols:
-        strts = strts + str(s[0:2]) + '_'
-    name = 'DT_' + str(i) + '_' + strts + str(search.best_index_)
-    
-    tmp = scoring_table(search, search.best_index_, cols) 
-    plot_learning_curve(search, X_train[cols], y_train, name=name)
-    
-    with open('../tree_data/' + name + '.pickle', 'wb') as f:
-        pickle.dump([search,result,cols], f)
+result = search.cv_results_
+
+pd.DataFrame(result)[['param_model__max_depth', 
+                      'mean_test_recall', 
+                      'mean_train_recall']].sort_values('mean_test_recall', ascending=False).head(5)
+tmp = scoring_table(search, search.best_index_, cols) 
+
+name = 'DT_all_' + str(search.best_index_)
+
+plot_learning_curve(search, X_train[cols], y_train, name=name)
+
+data = {'features': [cols],
+       	'no features': len(cols),
+        'depth': search.best_index_,
+       	'acc': tmp.test[0],
+       	'rec': tmp.test[1],
+       	'prc': tmp.test[2]}
+
+df_res = pd.DataFrame(data)
+df_all = pd.DataFrame(data)
+
+# save depth and recall as comparison
+vgl = [tmp.test[1], search.best_index_]
+
+## checking all possible combinations and compare to full feature tree
+
+# for i in range(len(col_names)-1,2,-1):
+for i in range(3,len(col_names)):
+    col_combs = list(itertools.combinations(col_names, i))
+    print("----- No of features: " + str(i) + "; possible combinations: " + str(len(col_combs)) + " -----")
+    x = 0
+    for col_tup in col_combs:
+        x += 1
+        print(str(x) + "/" + str(len(col_combs)))
+        cols = list(col_tup)
+        cat_cols = []
+        if 'TRANS_TYPE' in cols:
+            cat_cols.extend(['TRANS_TYPE'])
+        if 'TEST_TYPE' in cols:
+            cat_cols.extend(['TEST_TYPE'])
+        if 'MAKE_VEHICLE_TYPE' in cols:
+            cat_cols.extend(['MAKE_VEHICLE_TYPE'])
+        if ('MAKE' in cols):
+            # transform make
+            make_processor = Pipeline([
+                ('make_transformer', MakeTransformer()),
+                ('encoder', OneHotEncoder(handle_unknown='ignore'))
+            ])
+            # Preprocessor
+            preprocessor = ColumnTransformer([
+                ('make_processor', make_processor, ['MAKE']),
+                ('encoder', OneHotEncoder(handle_unknown='ignore'), cat_cols)], 
+                remainder='passthrough'
+            ) 
+            # Combine preprocessor and linear model in pipeline
+            pipe = Pipeline([
+                ('preprocessing', preprocessor),
+                ('model', DecisionTreeClassifier(class_weight='balanced'))
+            ])
+        elif cat_cols != []: 
+            # Preprocessor
+            preprocessor = ColumnTransformer([
+                ('encoder', OneHotEncoder(handle_unknown='ignore'), cat_cols)], 
+                remainder='passthrough'
+            )
+            # Combine preprocessor and linear model in pipeline
+            pipe = Pipeline([
+                ('preprocessing', preprocessor),
+                ('model', DecisionTreeClassifier(class_weight='balanced'))
+            ])
+        else: 
+            pipe = Pipeline([
+                ('model', DecisionTreeClassifier(class_weight='balanced'))
+            ])
         
-    dep.append(search.best_index_)
-    acc.append(tmp.test[0])
-    rec.append(tmp.test[1])
-    prc.append(tmp.test[2])
-    col.append(cols)
-    
-ls = list(zip(dep,col,acc,rec,prc))
-df = pd.DataFrame(ls, columns =['max_depth', 'features', 'accuracy','recall','precision'])
-df.to_csv('../DT_' + str(i) + '.csv',index=False)
+        # Hyperparameter Grid
+        grid = {'model__max_depth': np.arange(2, m, 1)}
+        
+        # Instanciate Grid Search
+        search = GridSearchCV(pipe, 
+                              grid, 
+                              scoring=['accuracy', 'recall', 'precision'],
+                              cv=10,
+                              refit='recall',
+                              return_train_score=True,
+                              n_jobs=18
+                             ) 
+        search.fit(X_train[cols], y_train)
+        
+        result = search.cv_results_
+        
+        pd.DataFrame(result)[['param_model__max_depth', 
+                              'mean_test_recall', 
+                              'mean_train_recall']].sort_values('mean_test_recall', ascending=False).head(5)
+        tmp = scoring_table(search, search.best_index_, cols) 
+        
+        row = {'features': [cols],
+               	'no features': len(cols),
+                'depth': search.best_index_,
+               	'acc': tmp.test[0],
+               	'rec': tmp.test[1],
+               	'prc': tmp.test[2]}
+        
+        df_all = df_all.append(row, ignore_index=True)
+        
+        # EVALUATE MODEL: df for 
+        if search.best_index_ > 1:
+            if (tmp.test[1] > vgl[0]) or ((tmp.test[1] == vgl[0]) & (search.best_index_ != vgl[1])):
+                strts = ''
+                for s in cols:
+                    if s == 'ENGINE_WEIGHT_RATIO':
+                        strts = strts + 'EW_'
+                    elif s == 'MAKE_VEHICLE_TYPE':
+                        strts = strts + 'MV_'
+                    else:
+                        strts = strts + str(s[0:2]) + '_'
+                name = 'DT_' + strts + str(search.best_index_)
+                
+                plot_learning_curve(search, X_train[cols], y_train, name=name)
+                
+                df_res = df_res.append(row, ignore_index=True)
+                
+                # update comarison values
+                if tmp.test[1] > vgl[0]:
+                    vgl[0] = tmp.test[1]
+                    vgl[1] = search.best_index_
+                    
+    df_res.to_csv('../DT_' + str(i) + '.csv',index=False)
+    df_all.to_csv('../DT_all_' + str(i) + '.csv',index=False)
+            
+df_res.to_csv('../summary_DT.csv',index=False)
+df_all.to_csv('../summary_DT_all.csv',index=False)

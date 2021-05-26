@@ -12,11 +12,11 @@ class MakeTransformer(BaseEstimator, TransformerMixin):
     def __init__(self):
         self.makes_keep = None
         
-    def fit(self, X):
+    def fit(self, X, y=None):
         self.makes_keep = make_transform_get(X)
         return self
 
-    def transform(self, X):
+    def transform(self, X, y=None):
         df = X.copy()
         other_makes = [make for make in df['MAKE'].unique() if make not in self.makes_keep]
         df['MAKE'] = df['MAKE'].replace(other_makes, 'other')

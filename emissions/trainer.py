@@ -22,7 +22,6 @@ class Trainer():
         self.pipeline = None
         self.grid = kwargs.get('grid', {'model__max_depth': np.arange(2, 20, 1)})
         self.search_result = None
-        self.best_estimator = None
         self.metric = kwargs.get('metric', 'recall')
             
     def set_pipeline(self):
@@ -38,7 +37,7 @@ class Trainer():
         ])
         # Preprocessor
         preprocessor = ColumnTransformer([
-            ('make_processor', make_processor, ['MAKE']),
+            ('make_processor', make_processor, ['MAKE'])
         ], remainder='passthrough')
 
         # Combine preprocessor and linear model in pipeline
@@ -74,14 +73,12 @@ class Trainer():
     
     def learning_curve(self):
         plot_learning_curve(self.search_result.best_estimator_, 
-                            self.X, self.y, scoring='recall')
+                            self.X, self.y, scoring=self.metric)
         
 
 if __name__ == "__main__":
-    df = load_data()
-    df = clean_data(df)
     X_train, X_test, y_train, y_test = split(df=None, test_size=0.2)
-    trainer = Trainer(X_train, y_train)
+    trainer = Trainer(X_train[['VEHICLE_AGE', 'MILE_YEAR', 'MAKE']], y_train)
     trainer.grid_search()
-    tmp = trainer.evaluate()
+    tmp = trainer.evaluate(X_test[['VEHICLE_AGE', 'MILE_YEAR', 'MAKE']], y_test)
     print(tmp)

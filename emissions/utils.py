@@ -4,6 +4,7 @@ import numpy as np
 import pandas as pd
 import matplotlib.pyplot as plt
 from sklearn.metrics import accuracy_score, recall_score, precision_score
+from emissions.data import load_data, clean_data
 
 
 def scoring_table(search, 
@@ -68,22 +69,16 @@ def make_transform_get(df, make_threshhold="0.01"):
     '''
     Take cleaned training data and return a list of makes to be converted to 'other'
     '''
-    #set make to string and to lower case, strip trailing and internal whitespace
-    #df['MAKE'] = df['MAKE'].astype('string').str.strip().str.lower().str.replace(' ', '')
     #create a make label 'other' for all makes that only account for less than 1% of cars each and together aprox <10% of cars
     value_counts_norm = df['MAKE'].value_counts(normalize = True)
     to_other = value_counts_norm[value_counts_norm < float(make_threshhold)]
     print(f"\n{len(to_other)} make labels each account for less than {round((float(make_threshhold) *100), 2)}% of cars and together account for {(round(to_other.sum(), 4)) *100}% of cars")
-    #print("Grouping these car makes into one category called 'other'")
-    #df['MAKE'] = df['MAKE'].replace(to_other.index, 'other')
-    list_to_other = list(to_other.index)
-    list_to_other.sort()
-    return list_to_other
+    to_keep = value_counts_norm[value_counts_norm >= float(make_threshhold)]
+    makes_keep = list(to_keep.index)
+    makes_keep.sort()
+    return makes_keep
 
-#def make_transform_set(df, list_to_other):
-#    '''
-#    Take test df and replace make labels from list with 'other'
-#    '''
-#    df = df.copy()
-#    df['MAKE'] = df['MAKE'].replace(list_to_other, 'other')
-#    return df
+if __name__=="__main__":
+    df = load_data()
+    df = clean_data(df)
+    print('Makes to keep:', make_transform_get(df))

@@ -22,12 +22,14 @@ class Trainer():
         self.pipeline = None
         self.grid = kwargs.get('grid', {'model__max_depth': np.arange(2, 20, 1)})
         self.search_result = None
+        self.best_estimator = None
+        self.metric = kwargs.get('metric', 'recall')
             
     def set_pipeline(self):
         """defines the pipeline as a class attribute"""
         if self.estimator == 'tree':
             model = DecisionTreeClassifier(class_weight='balanced')
-        elif self.estimator == 'forrest':
+        elif self.estimator == 'forest':
             model = RandomForestClassifier()
         # transform make
         make_processor = Pipeline([
@@ -55,7 +57,7 @@ class Trainer():
                       param_grid=self.grid, 
                       scoring=['accuracy', 'recall', 'precision'],
                       cv=10,
-                      refit='recall',
+                      refit=self.metric,
                       return_train_score=True,
                       n_jobs=-1
                      ) 

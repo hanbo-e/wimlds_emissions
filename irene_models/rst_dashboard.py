@@ -34,7 +34,9 @@ print('\nNumber of unique makes in test', X_test_update.MAKE.nunique())
 # transform MAKE into one-hot numeric array
 enc = OneHotEncoder(handle_unknown='ignore')
 MAKE_train = pd.DataFrame(enc.fit_transform(X_train_update[['MAKE']]).toarray())
+MAKE_train = MAKE_train.add_prefix('MAKE_')
 MAKE_test = pd.DataFrame(enc.fit_transform(X_test_update[['MAKE']]).toarray())
+MAKE_test = MAKE_test.add_prefix('MAKE_')
 
 # drop MAKE and add the one-hot numeric array to form one new data frame
 X_train_rel = X_train_update.drop('MAKE',axis=1)

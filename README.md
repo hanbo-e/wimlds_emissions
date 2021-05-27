@@ -10,7 +10,7 @@ Build a web-app where vehicle owners can check how likely their vehicles pass or
 ![pass the test](can_pass.png)
 
 ### How
-With a decision tree classifier by mid year we could already reduce the amount of polluting cars by 392 compared to current policy. 
+Using a decision tree classifier we could have reduced the amount of polluting cars by 392 compared to current policy by June of 2020. We achieve this by calling in the cars predicted to fail their test for a checkup first. 
 
 # Resources
 https://www.cabq.gov/abq-data/

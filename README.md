@@ -10,7 +10,7 @@ Build a web-app where vehicle owners can check how likely their vehicles pass or
 ![pass the test](can_pass.png)
 
 ### How
-Build a classification model using vehicle features
+With a decision tree classifier by mid year we could already reduce the amount of polluting cars by 392 compared to current policy. 
 
 # Resources
 https://www.cabq.gov/abq-data/

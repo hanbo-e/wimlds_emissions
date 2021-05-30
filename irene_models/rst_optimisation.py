@@ -7,8 +7,12 @@ Created on Sun May 30 16:53:43 2021
 
 import pandas as pd
 
+from numpy import mean
+
 from sklearn.ensemble import RandomForestClassifier
 from sklearn.preprocessing import OneHotEncoder
+from sklearn.model_selection import cross_val_score
+from sklearn.model_selection import RepeatedStratifiedKFold
 from sklearn.metrics import confusion_matrix,classification_report
 from sklearn.model_selection import GridSearchCV
 
@@ -49,11 +53,21 @@ MAKE_test.reset_index(drop=True, inplace=True)
 X_test_rel = pd.concat([X_test_rel, pd.DataFrame(MAKE_test)],axis=1)
 
 # fit a standard RandomForestClassifier
-model = RandomForestClassifier(n_estimators=100,n_jobs=18)
+model = RandomForestClassifier(n_estimators=100,n_jobs=18,
+                               class_weight='balanced')
 model.fit(X_train_rel, y_train)
 y_pred = model.predict(X_test_rel)
 tmp = confusion_matrix(y_test,y_pred)
 print(classification_report(y_test, y_pred))
+
+# simple cross validation
+model = RandomForestClassifier(n_estimators=100,n_jobs=18,
+                               class_weight='balanced')
+cv = RepeatedStratifiedKFold(n_splits=10, n_repeats=3, random_state=1)
+scores = cross_val_score(model, X_train_rel, y_train, 
+                         scoring='accuracy', cv=cv, n_jobs=18)
+mean(scores)
+
 
 # use a Grid Search
 n_estimators = [50, 100, 250, 500, 1000]
@@ -65,7 +79,7 @@ hyperF = dict(n_estimators = n_estimators, max_depth = max_depth,
               min_samples_split = min_samples_split, 
               min_samples_leaf = min_samples_leaf)
 
-gridF = GridSearchCV(RandomForestClassifier(), hyperF, verbose = 1,  
+gridF = GridSearchCV(RandomForestClassifier(class_weight='balanced'), hyperF, verbose = 1,  
                      scoring=['accuracy', 'recall', 'precision'],
                      refit='precision',
                      return_train_score=True,

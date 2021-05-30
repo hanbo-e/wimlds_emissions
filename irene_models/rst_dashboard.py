@@ -9,6 +9,7 @@ import pandas as pd
 
 from sklearn.ensemble import RandomForestClassifier
 from sklearn.preprocessing import OneHotEncoder
+from sklearn.metrics import confusion_matrix,classification_report
 
 from emissions.data import load_data, clean_data, split
 from emissions.trainer import MakeTransformer
@@ -49,10 +50,13 @@ MAKE_test.reset_index(drop=True, inplace=True)
 X_test_rel = pd.concat([X_test_rel, pd.DataFrame(MAKE_test)],axis=1)
 
 # fit a standard RandomForestClassifier
-model = RandomForestClassifier(n_estimators=50, max_depth=10)
+model = RandomForestClassifier(n_estimators=100,n_jobs=12)
 model.fit(X_train_rel, y_train)
+y_pred = model.predict(X_test_rel)
+tmp = confusion_matrix(y_test,y_pred)
+print(classification_report(y_test, y_pred))
 
 # use Explainer Dashboard
 explainer = ClassifierExplainer(model, X_test_rel, y_test)
-db = ExplainerDashboard(explainer)
+db = ExplainerDashboard(explainer,shap_interaction=False)
 db.run()

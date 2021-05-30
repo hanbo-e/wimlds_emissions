@@ -6,6 +6,7 @@ Created on Sun May 30 16:53:43 2021
 """
 
 import pandas as pd
+import pickle
 
 from numpy import mean
 
@@ -86,3 +87,10 @@ gridF = GridSearchCV(RandomForestClassifier(class_weight='balanced'), hyperF, ve
                      n_jobs = 18)
 
 bestF = gridF.fit(X_train_rel, y_train)
+
+y_pred = bestF.predict(X_test_rel)
+print(classification_report(y_test, y_pred))
+
+filename = 'irene_models/grid_search.pickle'
+with open(filename, 'wb') as f:
+    pickle.dump([bestF, gridF, hyperF], f)

@@ -50,7 +50,8 @@ MAKE_test.reset_index(drop=True, inplace=True)
 X_test_rel = pd.concat([X_test_rel, pd.DataFrame(MAKE_test)],axis=1)
 
 # fit a standard RandomForestClassifier
-model = RandomForestClassifier(n_estimators=100,n_jobs=12)
+model = RandomForestClassifier(n_estimators=100,n_jobs=-1,max_depth=30,
+                              min_samples_leaf=1,min_samples_split=2)
 model.fit(X_train_rel, y_train)
 y_pred = model.predict(X_test_rel)
 tmp = confusion_matrix(y_test,y_pred)

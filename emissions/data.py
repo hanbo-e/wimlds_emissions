@@ -84,10 +84,14 @@ def clean_data(df):
     df = df[df.GVWR > 1000]
     print(colored(f'\nRecords after droping rows where GVWR is < 1000 or missing: {df.shape[0]}', 'red'))
     
-    # if a vehicle has multiple test records within 1 month, keep earliest record 
+    # if a vehicle has multiple test records within 90 days, keep earliest record 
     df = df.sort_values('TEST_SDATE')
     df = df.loc[~(df.groupby('VIN')['TEST_SDATE'].diff() < np.timedelta64(90, 'D'))]
     print(colored(f'\nRecords after keeping only the earliest test within a month for each vehicle: {df.shape[0]}', 'red'))
+    
+    # engineer AFTER_COVID feature
+    df['AFTER_COVID'] = df.TEST_SDATE.dt.year >= 2020
+    print('\nRecords where AFTER_COVID is True:', df[df.AFTER_COVID==1].shape[0])
     
     # drop 0s in ODOMETER and remove 9999999 and 8888888
     print('\nRecords where ODOMETER = 0:', df[df.ODOMETER==0].shape[0])
@@ -105,11 +109,9 @@ def clean_data(df):
     # use ENGINE_WEIGHT_RATIO to identify sports cars
     df['SPORT'] = df['ENGINE_WEIGHT_RATIO'] > 2
     df["SPORT"] = df["SPORT"].astype(int)
-    
-    # engineer MAKE_VEHICLE_TYPE    
+      
     #set make to string and to lower case, strip trailing and internal whitespace
     df['MAKE'] = df['MAKE'].astype('string').str.strip().str.lower().str.replace(' ', '')
-    #df['MAKE_VEHICLE_TYPE'] = df['MAKE'] + df.VEHICLE_TYPE.astype('str')
     
     # select columns
     cols = ['VEHICLE_TYPE',
@@ -172,4 +174,3 @@ def split(df=None, test_size=0.2):
 if __name__ == "__main__":
     df = load_data()
     clean_df = clean_data(df)
-    print(clean_df.columns)

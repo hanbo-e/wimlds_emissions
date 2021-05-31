@@ -127,7 +127,8 @@ def clean_data(df):
             'MAKE',
             'ENGINE_WEIGHT_RATIO',
             'SPORT',
-            'TEST_SDATE'
+            'TEST_SDATE',
+            'AFTER_COVID'
             ]
     df = df[cols].copy()
     

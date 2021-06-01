@@ -23,10 +23,12 @@ from emissions.trainer import MakeTransformer
 # get the data and split
 df = load_data()
 df = clean_data(df)
+df['AFTER_COVID'] = df['AFTER_COVID'].astype('int32')
 X_train, X_test, y_train, y_test = split(df)
 
 # choose initial columns to be check feature importance
-cols = ['MODEL_YEAR','VEHICLE_AGE','MILE_YEAR', 'ENGINE_WEIGHT_RATIO','MAKE']
+cols = ['MODEL_YEAR','VEHICLE_AGE','MILE_YEAR', 'ENGINE_WEIGHT_RATIO',
+        'MAKE','AFTER_COVID']
 
 # transform rare MAKE into other
 mt = MakeTransformer().fit(X_train[cols])
@@ -54,16 +56,18 @@ MAKE_test.reset_index(drop=True, inplace=True)
 X_test_rel = pd.concat([X_test_rel, pd.DataFrame(MAKE_test)],axis=1)
 
 # fit a standard RandomForestClassifier
-model = RandomForestClassifier(n_estimators=100,n_jobs=18,
-                               class_weight='balanced')
+model = RandomForestClassifier(n_estimators=1000,n_jobs=2,
+                               class_weight='balanced',max_depth=30,
+                               min_samples_leaf=1,min_samples_split=2)
 model.fit(X_train_rel, y_train)
 y_pred = model.predict(X_test_rel)
 tmp = confusion_matrix(y_test,y_pred)
 print(classification_report(y_test, y_pred))
 
 # simple cross validation
-model = RandomForestClassifier(n_estimators=100,n_jobs=18,
-                               class_weight='balanced')
+model = RandomForestClassifier(n_estimators=1000,n_jobs=18,
+                               class_weight='balanced',max_depth=30,
+                               min_samples_leaf=1,min_samples_split=2)
 cv = RepeatedStratifiedKFold(n_splits=10, n_repeats=3, random_state=1)
 scores = cross_val_score(model, X_train_rel, y_train, 
                          scoring='accuracy', cv=cv, n_jobs=18)
@@ -71,8 +75,8 @@ mean(scores)
 
 
 # use a Grid Search
-n_estimators = [50, 100, 250, 500, 1000]
-max_depth = [5, 10, 15, 25, 30]
+n_estimators = [50, 100, 250, 500, 1000, 1250, 1500]
+max_depth = [5, 10, 15, 25, 30, 35, 40]
 min_samples_split = [2, 5, 10, 15, 100]
 min_samples_leaf = [1, 2, 5, 10] 
 

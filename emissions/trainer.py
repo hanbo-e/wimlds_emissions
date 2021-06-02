@@ -107,8 +107,8 @@ class Trainer():
         """
         using self.search_result and self.metric plots learning curve
         """
-        print('\nFeatures included:', ' + '.join(self.X.columns.values))
-        print('Metric used:', self.metric)
+        #print('\nFeatures included:', ' + '.join(self.X.columns.values))
+        #print('Metric used:', self.metric)
         plot_learning_curve(self.search_result.best_estimator_, 
                             self.X, 
                             self.y, 

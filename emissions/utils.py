@@ -72,7 +72,7 @@ def make_transform_get(df, make_threshhold="0.01"):
     #create a make label 'other' for all makes that only account for less than 1% of cars each and together aprox <10% of cars
     value_counts_norm = df['MAKE'].value_counts(normalize = True)
     to_other = value_counts_norm[value_counts_norm < float(make_threshhold)]
-    print(f"\n{len(to_other)} make labels each account for less than {round((float(make_threshhold) *100), 2)}% of cars and together account for {(round(to_other.sum(), 4)) *100}% of cars")
+    #print(f"\n{len(to_other)} make labels each account for less than {round((float(make_threshhold) *100), 2)}% of cars and together account for {(round(to_other.sum(), 4)) *100}% of cars")
     to_keep = value_counts_norm[value_counts_norm >= float(make_threshhold)]
     makes_keep = list(to_keep.index)
     makes_keep.sort()

@@ -27,10 +27,10 @@ class Trainer():
             if X_train includes categorical columns, please give a list of categorical column names
             ex. with_categorical=['MAKE', 'TEST_TYPE']
         """
-        self.estimator = kwargs.get('estimator', 'tree')
         self.X = X
         self.y = y
         self.max_depth = kwargs.get('max_depth', np.arange(2, 10, 1))
+        self.n_estimators = kwargs.get('n_estimators', [1])
         self.metric = kwargs.get('metric', 'recall')
         self.with_categorical = kwargs.get('with_categorical', 'False')
         self.pipeline = None
@@ -39,10 +39,8 @@ class Trainer():
             
     def set_pipeline(self):
         """defines the pipeline as a class attribute"""
-        if self.estimator == 'tree':
-            model = DecisionTreeClassifier(class_weight='balanced')
-        elif self.estimator == 'forest':
-            model = RandomForestClassifier()
+        model = RandomForestClassifier(class_weight='balanced',
+                                       bootstrap=True)
         # transform make
         make_processor = Pipeline([
             ('make_transformer', MakeTransformer()),
@@ -82,7 +80,9 @@ class Trainer():
         saves grid search result as class attribute self.search_result
         '''
         self.set_pipeline()
-        grid = {'model__max_depth': self.max_depth}
+        grid = {'model__max_depth': self.max_depth,
+                'model__n_estimators': self.n_estimators
+                }
         search = GridSearchCV(self.pipeline, 
                       param_grid=grid, 
                       scoring=['accuracy', 'recall', 'precision'],

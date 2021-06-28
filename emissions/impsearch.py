@@ -8,17 +8,22 @@ from sklearn.metrics import precision_score
 
 class ImpSearch():
     """ 
-    this class is built to used to facilitate analysis for answering following question:
+    this class is built to facilitate analysis for answering following question:
     How different {year} could have been with implementation of our solution?
-    It is a bit similar to GridSearch. 
     What ImSearch do:
-    For each param, it trains the model and implement our solution on test year 
-    and then collects the corresponding pollution quantity. After finishing this for all 
-    possible params, it will select the params that gave the smallest pollution quantity
-    as best param and plot the implementation outcome for that year
+    1. For each param, 
+       it trains the model, performs implement analysis on test year 
+       and then collects total pollution quantity in that year caused by vehicles that failed the test. 
+    2. After finishing the above steps for all possible params, 
+       it will select the params that gave the smallest pollution quantity
+       as best param and plot the implementation outcome for that year
+    check out notebooks/what_if_2020.ipynb for usage 
     """
-    cols = ['VEHICLE_AGE', 'MILE_YEAR', 'MAKE', 'MODEL_YEAR', 'ENGINE_WEIGHT_RATIO']
+    
+    cols = ['VEHICLE_AGE', 'MILE_YEAR', 'MAKE', 
+            'MODEL_YEAR', 'ENGINE_WEIGHT_RATIO']
     cat_col = ['MAKE']
+    
     def __init__(self):
         """
         """
@@ -52,7 +57,7 @@ class ImpSearch():
     
     def train_test_split(self, year):
         ''' 
-        splits the data into train and test sets using the given year
+        for a given year, splits data to train (before that year) and test (in that year)
         '''
         train = self.df[self.df.TEST_SDATE.dt.year < year].sort_values('TEST_SDATE')
         test = self.df[self.df.TEST_SDATE.dt.year == year].sort_values('TEST_SDATE')
@@ -67,7 +72,7 @@ class ImpSearch():
         '''
         uses Trainer class from trainer.py to get the fitted estimator
         prints the evluation scores
-        plots learning curve
+        if you want to plot learning curve, uncomment the last line 
         ''' 
         trainer = Trainer(self.X_train[self.cols],
                           self.y_train,
@@ -97,38 +102,57 @@ class ImpSearch():
         df.drop(columns=['count_fail', 'count_test', 'TEST_SDATE'], inplace=True)
         return df
     
-    def count_fails_captured(self, 
-                             data, 
-                             precision, 
-                             predicted_fails,
-                             true_fails):
-        """ 
-        params:
-        data: output df from get_cumulated_tests
-        precision: precision score on test set
-        predicted_fails: number of fails predicted
-        true_fails: number of predicted failed vehicles that acutally fail the test
-        returns a panda series: number of fails captured along the year
-        """
-        df = data.copy()
-        # first test all the predicted fails
-        df['fails_captured'] = df.n_tests * precision
-        # changes after finish testing predicted fails
-        tests_left = df[df.n_tests > predicted_fails].shape[0]
-        fails_left = self.total_fails - true_fails
-        avg_fail_per_test = fails_left/tests_left
-        df.loc[df.n_tests > predicted_fails, 'fails_captured'] = true_fails +\
-            (df[df.n_tests > predicted_fails]['n_tests'] - predicted_fails)*avg_fail_per_test
-        return df.fails_captured
+    def plot_heuristic_curve(self, df):
+        ''' 
+        this function is used in plot_simulation_plot():
+        it plots the cumulative number of failed vehicles along the year with heuristic decision 
+        The heuristic decision is that we predict all the vehicles with age > 16 fail the emissions test
+        '''
+        # get heuristic prediction
+        y_pred = (self.X_test.VEHICLE_AGE > 16).astype('int')
+        true_fails = sum([i for i, j in zip (y_pred, self.y_test) if i + j == 2])
+        predicted_fails = y_pred.sum()
+        self.total_predicted_fails['heuristic'] = predicted_fails
+        # create df with prediction outcomes
+        pred_df = pd.DataFrame.from_dict({'y_true':self.y_test, 'y_pred':y_pred})
+        pred_df = pred_df.sort_values('y_pred', ascending=False)
+        # merge the prediction with counter table
+        pred_df.index = df.n_tests
+        df = df.merge(pred_df, how='left', left_on='n_tests', right_index=True)
+        # add new columns storing number of failed test captured along the year
+        df['fails_captured_heuristic'] = df.y_true.cumsum()
+        df['fails_left_heuristic'] = self.total_fails - df['fails_captured_heuristic']
+        plt.plot(df.index, 
+                df['fails_captured_heuristic'], 
+                label='with heuristic')
+        # mark the time when all the predicted fail tests from precision favored model are completed
+        t = df[df.n_tests==predicted_fails].index[0]
+        cap_fails = df[df.n_tests==predicted_fails]['fails_captured_heuristic'][0]
+        true_fails = df[df.n_tests==predicted_fails].n_fails[0]
+        print('\n With heuristic decision:')
+        print(f'''\nBy the time {str(t)[:10]}, 
+                - {round(true_fails)} vehicles were off the road in reality
+                - {round(cap_fails)} vehicles could have been off the road with heuristic decision''')
+        # what about dayofyear = 100
+        t2 = df[df.dayofyear==100].index[0]
+        cap_fails2 = df[df.index==t2]['fails_captured_heuristic'][0]
+        true_fails2 = df[df.index==t2].n_fails[0]
+        print(f'''\nBy the time {str(t2)[:10]}, 
+                - {round(true_fails2)} vehicles were off the road in reality
+                - {round(cap_fails2)} vehicles could have been off the road with heuristic decision''') 
+        # store the pollution quantity in pollution
+        self.pollutions['heuristic'] = df['fails_left_heuristic'].sum()
+        return df
         
     def plot_simulation_curve(self, year, df):
         '''
         for given year, plots:
-        1. how many failed tests were detected along that year
-        2. how many failed tests could have been deen detected along that year if our solution is implemented
+        1. cumulative number of failed tests in reality along that year 
+        2. cumulative number of failed tests along that year if our solution was implemented
+        3. cumulative number of failed tests along that year if heuristic decision was made
         '''
         # find the best max_depth and ploting 
-        plt.figure(figsize=(10, 6))
+        plt.figure(figsize=(10, 5))
         plt.plot(df.index, 
                 df.n_fails, 
                 label='with current policy', c='red')
@@ -139,16 +163,20 @@ class ImpSearch():
             trainer = self.get_estimator([depth])
             # get all the numbers
             y_pred = trainer.search_result.predict(self.X_test[self.cols])
-            precision = precision_score(self.y_test, y_pred)
             true_fails = sum([i for i, j in zip (y_pred, self.y_test) if i + j == 2])
             predicted_fails = y_pred.sum()
             self.total_predicted_fails[f'{depth}'] = predicted_fails
+            # sort testing order by proba
+            y_proba = trainer.search_result.predict_proba(self.X_test[self.cols])
+            pred_df = pd.DataFrame.from_dict({'y_true':self.y_test, 
+                                              'y_pred':y_pred, 
+                                              'y_proba':y_proba[:,1]})
+            pred_df = pred_df.sort_values('y_proba', ascending=False)
+            pred_df.index = df.n_tests
+            df = df.merge(pred_df, how='left', left_on='n_tests', right_index=True)
             # add new columns storing number of failed test captured along the year
-            df[f'fails_captured_{depth}'] = self.count_fails_captured(df, 
-                                                                      precision, 
-                                                                      predicted_fails, 
-                                                                      true_fails
-                                                                     )
+            df[f'fails_captured_{depth}'] = df.y_true.cumsum()
+            df.drop(columns=['y_true', 'y_pred', 'y_proba'], inplace=True)
             df[f'fails_left_{depth}'] = self.total_fails - df[f'fails_captured_{depth}']
             plt.plot(df.index, 
                     df[f'fails_captured_{depth}'], 
@@ -160,8 +188,8 @@ class ImpSearch():
             print(f'''\nBy the time {str(t)[:10]}, 
                     - {round(true_fails)} vehicles were off the road in reality
                     - {round(cap_fails)} vehicles could have been off the road using model max_depth = {depth}''')
-            # what about dayofyear = 182
-            t2 = df[df.dayofyear==182].index[0]
+            # what about dayofyear = 100
+            t2 = df[df.dayofyear==100].index[0]
             cap_fails2 = df[df.index==t2][f'fails_captured_{depth}'][0]
             true_fails2 = df[df.index==t2].n_fails[0]
             print(f'''\nBy the time {str(t2)[:10]}, 
@@ -169,6 +197,8 @@ class ImpSearch():
                     - {round(cap_fails2)} vehicles could have been off the road using model max_depth = {depth}''') 
             # store the pollution quantity in pollution
             self.pollutions[depth] = df[f'fails_left_{depth}'].sum()
+        # plot the curve of heuristic decision
+        df = self.plot_heuristic_curve(df)
         # fill in the area corresponding to total pollution
         plt.fill_between(df.index,
                         df.n_fails,
@@ -185,10 +215,16 @@ class ImpSearch():
         return df
         
     def implement(self, year, n_estimators=[1], max_depth=[2, 3]):
-        self.max_depth = max_depth
-        self.n_estimators = n_estimators
+        '''
+        params:
+        year: split train (before that year) and test (in that year)
+        max_depth and n_estimators: hyper params for grid search with random forest classifier 
+        '''
         # train set split
         self.train_test_split(year)
+        # get update the class attributes         
+        self.max_depth = max_depth
+        self.n_estimators = n_estimators
         # get counter table
         df = self.get_counter_table()
         # plotting simulation curve for each max_depth
@@ -199,11 +235,15 @@ class ImpSearch():
         self.best_depth = tmp.index[0]
         # save df
         self.anaylsis_table = df
-        df.to_csv(f'../data/implementation_analysis_{year}_best_depth_{self.best_depth}.csv') 
-        print(f'\nSaved implementation_analysis_{year}_best_depth_{self.best_depth}.csv in data folder')
+        df.to_csv(f'../data/implementation_analysis_{year}_best_{self.best_depth}.csv') 
+        print(f'\nSaved implementation_analysis_{year}_best_{self.best_depth}.csv in data folder')
         self.year = year 
         
     def plot_clean(self):
+        ''' 
+        similar to plot simulation method, 
+        only that this one plots the curve creatd by the best max_depth
+        '''
         df = self.anaylsis_table
         plt.figure(figsize=(10, 6))
         # reality curve
@@ -215,21 +255,20 @@ class ImpSearch():
                      df[f'fails_captured_{self.best_depth}'], 
                      label='with our solution', c='green')
         
-        # mark the time when all the predicted fail tests are completed
-        pf = self.total_predicted_fails[str(self.best_depth)]
         col = f'fails_captured_{self.best_depth}'
-        t = df[df.n_tests==pf].index[0]
-        # in simulated curve
+        t = df[df.dayofyear==100].index[0]
+        # horizontal grey line - simulated curve
         cap_fails = df[df.index==t][col].values[0]
-        plt.plot([t for i in range(100)], np.linspace(0, cap_fails, 100), c='grey')
         plt.plot(df[df.index < t].index, 
                  [cap_fails for i in range(df[df.index < t].shape[0])], 
                  c='grey')
-        # in reality curve
+        # horizontal grey line - reality curve
         true_fails = df[df.index==t].n_fails.values[0]
         plt.plot(df[df.index < t].index, 
                  [true_fails for i in range(df[df.index < t].shape[0])], 
                  c='grey')
+        # vertical grey line
+        plt.plot([t for i in range(100)], np.linspace(0, cap_fails, 100), c='grey')
         # fill in the area corresponding to reduced pollution
         plt.fill_between(df.index,
                         df.n_fails,
